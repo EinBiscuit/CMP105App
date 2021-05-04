@@ -3,9 +3,15 @@
 #include <SFML/Graphics.hpp>
 #include <string.h>
 #include <iostream>
+#include "PerlinNoise.h"
 
+struct Mouse
+{
+	int x = 0;
+	int y = 0;
 
-struct Mouse;
+	float w_delta = 0;
+};
 
 class Level{
 public:
@@ -25,14 +31,25 @@ private:
 	Mouse* mouse;
 
 	sf::RectangleShape rect;
+	sf::Vector2i TexSize;
+
+	sf::Image* mandelbrot;
+	sf::Image perlin_image;
+	sf::Image  palpatine;
+
+	sf::Texture palpatine_tex;
 	sf::Texture mandelbrot_tex;
 
-	int depth = 1;
+	double zoom = 1;
 	sf::Vector2f center;
 	double left = -2.0;
 	double right = 1.0;
 	double top = 1.125;
 	double bottom = -1.125;
 
-	
+	bool mouseDown=false;
+	sf::Vector2<double> offset;
+
+	void recalculate();
+	sf::Image blur(sf::Image*);
 };
