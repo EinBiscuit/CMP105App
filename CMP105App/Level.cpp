@@ -61,44 +61,44 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 
 
 
-	//PERLIN NOISE IS GENERATED HERE AND SET INSTEAD OF MANDELBROT
-
 	double* perlin = PerlinNoise::GeneratePerlin();
 
 	perlin_image.create(PerlinNoise::WIDTH, PerlinNoise::HEIGHT, sf::Color::Magenta);
-	
+
 	for (int i = 0; i < PerlinNoise::HEIGHT; i++)
 	{
+		//std::cout << "\n new Row ";
 		for (int j = 0; j < PerlinNoise::WIDTH; j++)
 		{
-			uint8_t R = 255 * (perlin[(i * PerlinNoise::WIDTH) + j]);
-			uint8_t G = 255 * (perlin[(i * PerlinNoise::WIDTH) + j]);
-			uint8_t B = 255 * (perlin[(i * PerlinNoise::WIDTH) + j]);
-			uint32_t color  = (R<<24 | G<<16 | B<<8 | 255);
+			//	std::cout << perlin[i * PerlinNoise::WIDTH + j]+1 << " ";
+
+			uint8_t R = 127 * (perlin[(i * PerlinNoise::WIDTH) + j] + 1);
+			uint8_t G = 127 * (perlin[(i * PerlinNoise::WIDTH) + j] + 1);
+			uint8_t B = 127 * (perlin[(i * PerlinNoise::WIDTH) + j] + 1);
+			uint32_t color = (R << 24 | G << 16 | B << 8 | 255);
+
 			perlin_image.setPixel(i, j, sf::Color(color));
 
-			//std::cout <<"0 "<< result[i*width+j] <<" ";
+			//	std::cout <<" "<< perlin[i* PerlinNoise::WIDTH +j]+1 <<" ";
 		}
+
 	}
 
 	mandelbrot = new sf::Image;
 	mandelbrot->create(1024, 1024, sf::Color::Magenta);
 	mandelbrot_tex.loadFromImage(perlin_image);
 
-
-
-
 	//compute_mandelbrot_gpu(-2.0, 1.0, 1.125, -1.125);
-	//arrayhelper(0);
 
 	//image palpatine
 
 	//palpatine.loadFromFile("palpatine.jpg");
-	//palpatine_tex.loadFromImage(palpatine);
+	//std::cout << palpatine.getSize().x << "x" << palpatine.getSize().y;
+	//palpatine_tex.loadFromImage(blur(&palpatine,7));
 
 	//rectangle
 	//rect.setSize((sf::Vector2f)window->getSize());
-	rect.setSize(sf::Vector2f(PerlinNoise::WIDTH*2.5, PerlinNoise::WIDTH*2.5));
+	//rect.setSize(sf::Vector2f(PerlinNoise::WIDTH*2.5, PerlinNoise::WIDTH*2.5));
 	rect.setTexture(&mandelbrot_tex);
 	//rect.setTexture(&palpatine_tex);
 	//rect.setFillColor(sf::Color::Red);
@@ -124,8 +124,7 @@ void Level::recalculate()
 
 	//mouse.x /= zoom;
 	//mouse.y /= zoom;
-
-
+	
 	//debug
 	//std::cout << mouse.x << " ";
 	//std::cout << mouse.y << std::endl;
@@ -160,14 +159,14 @@ void Level::handleInput()
 	}*/
 
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) { zoom *= 1.2; recalculate();}
-	if (sf::Keyboard::isKeyPressed(sf::Keyboard::U) && zoom > 1) {	zoom /= 1.2; recalculate();	}
+	if (sf::Keyboard::isKeyPressed(sf::Keyboard::X) && zoom > 1) {	zoom /= 1.2; recalculate();	}
 }
 
 // Update game objects
 void Level::update()
 {
 	//compute_mandelbrot_gpu(left, right, top, bottom);
-	//rect.setSize((sf::Vector2f)window->getSize());
+	rect.setSize((sf::Vector2f)window->getSize());
 	//rect.setTexture(&mandelbrot_tex);
 }
 
@@ -349,33 +348,36 @@ void Level::compute_mandelbrot_gpu(double left, double right, double top, double
 	a.discard_data();
 
 	concurrency::parallel_for_each(a.extent, [=](concurrency::index<2> idx)restrict(amp)
+	{
+		//in 1D array size maxX*maxY any elements [index] x is index%maxX and y is index/maxX
+		Complex1 c{ left + ((idx[0]) * (right - left) / Wsize.x),
+			top + ((idx[1]) * (bottom - top) / Wsize.y)};
+		Complex1 z{ 0.0,0.0 };
+
+		uint32_t iterations = 0;
+
+		while (c_abs(z) < 2.0 && iterations < MAX_ITERATIONS)
 		{
-			//in 1D array size maxX*maxY any elements [index] x is index%maxX and y is index/maxX
-			Complex1 c{ left + ((idx[0]) * (right - left) / Wsize.x),
-				top + ((idx[1]) * (bottom - top) / Wsize.y)};
-			Complex1 z{ 0.0,0.0 };
+			z = c_add(c_mul(z,z),c);
+			++iterations;
+		}
+		
+		uint32_t R;
+		uint32_t G;
+		uint32_t B;
 
-			uint32_t iterations = 0;
-
-			while (c_abs(z) < 2.0 && iterations < MAX_ITERATIONS)
-			{
-				z = c_add(c_mul(z,z),c);
-				++iterations;
-			}
-			
-			uint32_t color = ((iterations * colorPeriod)) | 255;
-			a [idx[0]][idx[1]] = color;
-		});
+		uint32_t color = ((iterations * colorPeriod)) | 255;
+		a [idx] = color;
+	});
 
 	a.synchronize();
-
-	//blur(pImage, Wsize);
 
 	for (int i = 0; i < Wsize.x; i++)
 	{
 		for (int j = 0; j < Wsize.y; j++)
 		{
-			if (mandelbrot)mandelbrot->setPixel(i, j, sf::Color(pImage[(i * Wsize.y) + j]));
+			if (mandelbrot)mandelbrot->setPixel(i, j, sf::Color((0xFFFFFF - pImage[(i * Wsize.y) + j])|255));
+
 		}
 	}
 
@@ -388,8 +390,9 @@ void Level::compute_mandelbrot_gpu(double left, double right, double top, double
 }
 
 //Image size must be 1024x1024
-sf::Image Level::blur(sf::Image* image)
+sf::Image Level::blur(sf::Image* image, int passes )
 {
+	if (passes <= 0) return *image;
 	sf::Vector2i SIZE = { (int)image->getSize().x,(int)image->getSize().y };
 	////Tilesizelimit 1024 total between xyz
 	////no way to fit larger images without splitting them up or somehow overlaping the tiles
@@ -397,7 +400,6 @@ sf::Image Level::blur(sf::Image* image)
 	//// to blur an image this way would mean that the maximum resolution of an image would be 1024 x 1024 right?
 	//// 
 	////remove the tiles entirely or find a solution around that
-	////surface question recorded.
 
 	const int Filter_S = 7;
 
@@ -411,6 +413,7 @@ sf::Image Level::blur(sf::Image* image)
 			iImage[(i * SIZE.y) + j] = image->getPixel(i, j).toInteger();
 		}
 	}
+
 	static const int TSH = 1 << 10; //1024 maximum tile size
 	static const int TSV = 1 << 10;
 
@@ -432,8 +435,8 @@ sf::Image Level::blur(sf::Image* image)
 
 	//half matrix
 	struct filterB {
-		float Distribution[7] = { 1, 2 , 3, 4, 3, 2, 1 };
-		float FRACTION = 1.f / 256.f; //1.f / 256.f;
+		float Distribution[7] = { 1, 6 , 15, 20, 15, 6, 1 };
+		float FRACTION = 1.f / 64; //1.f / 256.f;
 
 		filterB() {
 			for (auto i = 0; i < 7; i++)
@@ -446,67 +449,90 @@ sf::Image Level::blur(sf::Image* image)
 	filterB GD;
 	extent<2> E(1024, 1024);
 
-
 	concurrency::array_view<uint32_t, 2> av_src(E, iImage);
 	concurrency::array_view<uint32_t, 2> av_dst(E, bImage);
 	av_dst.discard_data();
 
 	/*It is wise to use exception handling here - AMP can fail for many reasons
 	and it useful to know why (e.g. using double precision when there is limited or no support)*/
+	for (int i = 0; i < passes; i++) {
+		try
+		{
+			concurrency::parallel_for_each(E.tile<TSH, 1>(), [=](tiled_index<TSH, 1> tidx) restrict(amp)
+				{
+					index<2> idx = tidx.global;
 
-	try
-	{
-		concurrency::parallel_for_each(E.tile<TSH, 1>(), [=](tiled_index<TSH, 1> tidx) restrict(amp)
-			{
-				index<2> idx = tidx.global;
+					tile_static uint32_t tile_data[TSH];
+					tile_data[idx[0]] = av_src[idx];
+					tidx.barrier.wait();
 
-				tile_static float tile_data[TSH];
-				tile_data[idx[0]] = av_src[idx];
-				tidx.barrier.wait();
+					int textureLocationX = idx[0] - (Filter_S / 2);
 
-				int textureLocationX = idx[0] - (Filter_S / 2);
+					uint32_t R = 0;
+					uint32_t G = 0;
+					uint32_t B = 0;
 
-				float blurbedPix = 0;
+					for (int i = 0; i < Filter_S; i++)
+					{
+						R += ((tile_data[textureLocationX + i] & 0xFF000000) >> 24) * GD.Distribution[i];
+						G += ((tile_data[textureLocationX + i] & 0x00FF0000) >> 16) * GD.Distribution[i];
+						B += ((tile_data[textureLocationX + i] & 0x0000FF00) >> 8) * GD.Distribution[i];
+					}
+					if (R > 255) R = 255;
+					if (G > 255) G = 255;
+					if (B > 255) B = 255;
 
-				for (int i = 0; i < Filter_S; i++)
-					blurbedPix += (tile_data[textureLocationX + i] * GD.Distribution[i]);
+					tidx.barrier.wait();
+					av_dst[idx] = (R << 24 | G << 16 | B << 8 | 255);
 
-				tidx.barrier.wait();
-				av_dst[idx] = blurbedPix;
+				});
 
-			});
+			av_dst.synchronize();
+		}
+		catch (const Concurrency::runtime_exception& ex)
+		{
+			MessageBoxA(NULL, ex.what(), "Error", MB_ICONERROR);
+		}
+		    std::swap(av_src, av_dst);
+		    av_dst.discard_data();
+		try
+		{
+			concurrency::parallel_for_each(E.tile<TSV, 1>(), [=](tiled_index<TSV, 1> tidx) restrict(amp)
+				{
+					index<2> idx = tidx.global;
 
-		av_dst.synchronize();
+					tile_static uint32_t tile_data[TSV];
+					tile_data[idx[0]] = av_src[idx[1]][idx[0]];
+					tidx.barrier.wait();
 
-		std::swap(av_src, av_dst);
-		av_dst.discard_data();
+					int textureLocationX = idx[1] - (Filter_S / 2);
 
-		concurrency::parallel_for_each(E.tile<TSV, 1>(), [=](tiled_index<TSV, 1> tidx) restrict(amp)
-			{
-				index<2> idx = tidx.global;
+					uint32_t R = 0;
+					uint32_t G = 0;
+					uint32_t B = 0;
 
-				tile_static float tile_data[TSV];
-				tile_data[idx[0]] = av_src[idx];
-				tidx.barrier.wait();
+					for (int i = 0; i < Filter_S; i++)
+					{
+						R += ((tile_data[textureLocationX + i] & 0xFF000000) >> 24) * GD.Distribution[i];
+						G += ((tile_data[textureLocationX + i] & 0x00FF0000) >> 16) * GD.Distribution[i];
+						B += ((tile_data[textureLocationX + i] & 0x0000FF00) >> 8)  * GD.Distribution[i];
+					}
 
-				int textureLocationX = idx[0] - (Filter_S / 2);
+					if (R > 255) R = 255;
+					if (G > 255) G = 255;
+					if (B > 255) B = 255;
 
-				uint32_t blurbedPix = 0;
+					tidx.barrier.wait();
+					av_dst[idx] = (R << 24 | G << 16 | B << 8 | 255);
+				});
 
-				for (int i = 0; i < Filter_S; i++) {
-					blurbedPix += (tile_data[textureLocationX + i] * GD.Distribution[i]);
-				}
-
-				tidx.barrier.wait();
-				av_dst[idx] = blurbedPix;
-
-			});
-
-		av_dst.synchronize();
-	}
-	catch (const Concurrency::runtime_exception& ex)
-	{
-		MessageBoxA(NULL, ex.what(), "Error", MB_ICONERROR);
+			av_dst.synchronize();
+		}
+		catch (const Concurrency::runtime_exception& ex)
+		{
+			MessageBoxA(NULL, ex.what(), "Error", MB_ICONERROR);
+		}
+		
 	}
 
 	sf::Image blurbedImage;

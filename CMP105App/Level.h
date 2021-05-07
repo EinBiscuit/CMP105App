@@ -51,5 +51,5 @@ private:
 	sf::Vector2<double> offset;
 
 	void recalculate();
-	sf::Image blur(sf::Image*);
+	sf::Image blur(sf::Image*, int passes = 1);
 };
