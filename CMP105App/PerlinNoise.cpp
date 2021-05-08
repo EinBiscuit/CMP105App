@@ -19,6 +19,9 @@ double* PerlinNoise::GeneratePerlin()
 
 	//how many pixels are in a grid cell
 	const static int PTS = 64;
+
+	PerlinClock::time_point start = PerlinClock::now();
+
 	try
 	{
 		concurrency::parallel_for_each(E.tile<PTS, 2>(), [=](tiled_index<PTS, 2> tidx) restrict(amp)
@@ -71,6 +74,11 @@ double* PerlinNoise::GeneratePerlin()
 	}
 
 	result_av.synchronize();
+
+	PerlinClock::time_point end = PerlinClock::now();
+	// Compute the difference between the two times in milliseconds
+	auto time = duration_cast<milliseconds>(end - start).count();
+	std::cout << "Perlin Gpu Compute took: " << time << " ms." << std::endl;
 
 	/*for (int i = 0; i < HEIGHT; i++)
 	{

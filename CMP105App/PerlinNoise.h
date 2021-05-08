@@ -4,6 +4,12 @@
 #include <random>
 #include <math.h>
 #include <iostream>
+#include <chrono>
+
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+
+typedef std::chrono::steady_clock PerlinClock;
 
 class PerlinNoise
 {
