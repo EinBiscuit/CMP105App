@@ -59,9 +59,7 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 	//compute_mandelbrot(-0.751085, -0.734975, 0.118378, 0.134488);
 	//compute_mandelbrot_multicore(-2.0, 1.0, 1.125, -1.125);
 
-
-
-	double* perlin = PerlinNoise::GeneratePerlin();
+	double* perlin = PerlinNoise::GeneratePerlin(); //output is values between 1 and -1
 
 	perlin_image.create(PerlinNoise::WIDTH, PerlinNoise::HEIGHT, sf::Color::Magenta);
 
@@ -79,13 +77,13 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 
 			perlin_image.setPixel(i, j, sf::Color(color));
 
-			//	std::cout <<" "<< perlin[i* PerlinNoise::WIDTH +j]+1 <<" ";
 		}
 
 	}
 
 	mandelbrot = new sf::Image;
 	mandelbrot->create(1024, 1024, sf::Color::Magenta);
+	//mandelbrot_tex.loadFromImage(blur(&perlin_image,13));
 	mandelbrot_tex.loadFromImage(perlin_image);
 
 	//compute_mandelbrot_gpu(-2.0, 1.0, 1.125, -1.125);
@@ -394,6 +392,7 @@ sf::Image Level::blur(sf::Image* image, int passes )
 {
 	if (passes <= 0) return *image;
 	sf::Vector2i SIZE = { (int)image->getSize().x,(int)image->getSize().y };
+
 	////Tilesizelimit 1024 total between xyz
 	////no way to fit larger images without splitting them up or somehow overlaping the tiles
 	//// 
@@ -459,72 +458,68 @@ sf::Image Level::blur(sf::Image* image, int passes )
 		try
 		{
 			concurrency::parallel_for_each(E.tile<TSH, 1>(), [=](tiled_index<TSH, 1> tidx) restrict(amp)
+			{
+				index<2> idx = tidx.global;
+
+				tile_static uint32_t tile_data[TSH];
+				tile_data[idx[0]] = av_src[idx];
+				tidx.barrier.wait();
+
+				int textureLocationX = idx[0] - (Filter_S / 2);
+
+				uint32_t R = 0;
+				uint32_t G = 0;
+				uint32_t B = 0;
+
+				for (int i = 0; i < Filter_S; i++)
 				{
-					index<2> idx = tidx.global;
+					R += ((tile_data[textureLocationX + i] & 0xFF000000) >> 24) * GD.Distribution[i];
+					G += ((tile_data[textureLocationX + i] & 0x00FF0000) >> 16) * GD.Distribution[i];
+					B += ((tile_data[textureLocationX + i] & 0x0000FF00) >> 8) * GD.Distribution[i];
+				}
+				if (R > 255) R = 255;
+				if (G > 255) G = 255;
+				if (B > 255) B = 255;
 
-					tile_static uint32_t tile_data[TSH];
-					tile_data[idx[0]] = av_src[idx];
-					tidx.barrier.wait();
+				tidx.barrier.wait();
+				av_dst[idx] = (R << 24 | G << 16 | B << 8 | 255);
 
-					int textureLocationX = idx[0] - (Filter_S / 2);
-
-					uint32_t R = 0;
-					uint32_t G = 0;
-					uint32_t B = 0;
-
-					for (int i = 0; i < Filter_S; i++)
-					{
-						R += ((tile_data[textureLocationX + i] & 0xFF000000) >> 24) * GD.Distribution[i];
-						G += ((tile_data[textureLocationX + i] & 0x00FF0000) >> 16) * GD.Distribution[i];
-						B += ((tile_data[textureLocationX + i] & 0x0000FF00) >> 8) * GD.Distribution[i];
-					}
-					if (R > 255) R = 255;
-					if (G > 255) G = 255;
-					if (B > 255) B = 255;
-
-					tidx.barrier.wait();
-					av_dst[idx] = (R << 24 | G << 16 | B << 8 | 255);
-
-				});
+			});
 
 			av_dst.synchronize();
-		}
-		catch (const Concurrency::runtime_exception& ex)
-		{
-			MessageBoxA(NULL, ex.what(), "Error", MB_ICONERROR);
-		}
-		    std::swap(av_src, av_dst);
-		    av_dst.discard_data();
-		try
-		{
+
+			std::swap(av_src, av_dst);
+			av_dst.discard_data();
+
+
 			concurrency::parallel_for_each(E.tile<TSV, 1>(), [=](tiled_index<TSV, 1> tidx) restrict(amp)
+			{
+				index<2> idx = tidx.global;
+
+				tile_static uint32_t tile_data[TSV];
+				tile_data[idx[0]] = av_src[idx[1]][idx[0]];
+				tidx.barrier.wait();
+
+				int textureLocationX = idx[1] - (Filter_S / 2);
+
+				uint32_t R = 0;
+				uint32_t G = 0;
+				uint32_t B = 0;
+
+				for (int i = 0; i < Filter_S; i++)
 				{
-					index<2> idx = tidx.global;
+					R += ((tile_data[textureLocationX + i] & 0xFF000000) >> 24) * GD.Distribution[i];
+					G += ((tile_data[textureLocationX + i] & 0x00FF0000) >> 16) * GD.Distribution[i];
+					B += ((tile_data[textureLocationX + i] & 0x0000FF00) >> 8) * GD.Distribution[i];
+				}
 
-					tile_static uint32_t tile_data[TSV];
-					tile_data[idx[0]] = av_src[idx[1]][idx[0]];
-					tidx.barrier.wait();
+				if (R > 255) R = 255;
+				if (G > 255) G = 255;
+				if (B > 255) B = 255;
 
-					int textureLocationX = idx[1] - (Filter_S / 2);
-
-					uint32_t R = 0;
-					uint32_t G = 0;
-					uint32_t B = 0;
-
-					for (int i = 0; i < Filter_S; i++)
-					{
-						R += ((tile_data[textureLocationX + i] & 0xFF000000) >> 24) * GD.Distribution[i];
-						G += ((tile_data[textureLocationX + i] & 0x00FF0000) >> 16) * GD.Distribution[i];
-						B += ((tile_data[textureLocationX + i] & 0x0000FF00) >> 8)  * GD.Distribution[i];
-					}
-
-					if (R > 255) R = 255;
-					if (G > 255) G = 255;
-					if (B > 255) B = 255;
-
-					tidx.barrier.wait();
-					av_dst[idx] = (R << 24 | G << 16 | B << 8 | 255);
-				});
+				tidx.barrier.wait();
+				av_dst[idx[1]][idx[0]] = (R << 24 | G << 16 | B << 8 | 255);
+			});
 
 			av_dst.synchronize();
 		}
@@ -532,7 +527,6 @@ sf::Image Level::blur(sf::Image* image, int passes )
 		{
 			MessageBoxA(NULL, ex.what(), "Error", MB_ICONERROR);
 		}
-		
 	}
 
 	sf::Image blurbedImage;
