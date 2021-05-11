@@ -31,7 +31,8 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 	//compute_mandelbrot_multicore(-2.0, 1.0, 1.125, -1.125);
 
 	double* perlin = PerlinNoise::GeneratePerlin(); //output is values between 1 and -1
-	//double* perlin = PerlinNoise::GeneratePerlin_cpu_fromWiki()// used for reference
+	//double* perlin = PerlinNoise::GeneratePerlinSerial();
+	//double* perlin = PerlinNoise::GeneratePerlin_cpu_fromWiki();// used for reference
 
 	perlin_image.create(PerlinNoise::WIDTH, PerlinNoise::HEIGHT, sf::Color::Magenta);
 
@@ -53,11 +54,13 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 
 	}
 
-	mandelbrot = new sf::Image;
-	mandelbrot->create(1024, 1024, sf::Color::Magenta);
+	
 	//perlin_tex.loadFromImage(blur(&perlin_image,13));
 	perlin_tex.loadFromImage(perlin_image);
 
+
+	//mandelbrot = new sf::Image;
+	//mandelbrot->create(1024, 1024, sf::Color::Magenta);
 	//compute_mandelbrot_gpu(-2.0, 1.0, 1.125, -1.125);
 
 	//image palpatine

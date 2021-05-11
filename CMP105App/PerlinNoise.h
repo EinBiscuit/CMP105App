@@ -14,14 +14,14 @@ typedef std::chrono::steady_clock PerlinClock;
 class PerlinNoise
 {
 public:
-	// amp friendly vector 2 struct with 
+	// amp friendly vector 2 struct required functions
 	struct Vector2
 	{
 		double x;
 		double y;
 	};
 
-	//FROM WIKIPEDIA  ADAPTED by me TO FOR AMP
+	//FROM WIKIPEDIA  ALTERED BY ME FOR AMP
 	static Vector2 random(int x, int y) restrict(amp)
 	{
 		float random = 2920.f * concurrency::fast_math::sin(x * 21942.f + y * 171324.f + 8912.f) * concurrency::fast_math::cos(x * 23157.f * y * 217832.f + 9758.f);
@@ -46,12 +46,12 @@ public:
 		float v = (a.x * a.x) + (a.y * a.y);
 		if (v > 0) {
 			v = sqrtf(v);
-			a.x /= v;
-			a.y /= v;
+			if(a.x)a.x /= v;
+			if(a.y)a.y /= v;
 		};
 	}
 
-	// AMD SMOOTHSTEP
+	// AMD SMOOTHSTEP https://en.wikipedia.org/wiki/Smoothstep
 	static float smoothstepAMD(float edge0, float edge1, float x) restrict(cpu, amp)
 	{
 		// Scale, bias and saturate x to 0..1 range
@@ -114,11 +114,15 @@ public:
 
 	static const uint32_t WIDTH = 1 << 10;
 	static const uint32_t HEIGHT = 1 << 10;
+	const static int PTS = 1 << 7;
 
 	static double* GeneratePerlin();
+
+	static double* GeneratePerlinSerial();
+
 	//very noisy, work but i think it mostly displays the random function
 	static double* GeneratePerlin_cpu_fromWiki();
 
-	//void GeneratePerlinLite();
+	
 };
 
