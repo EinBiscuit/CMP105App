@@ -11,48 +11,19 @@
 #include <vector>
 #include <random>
 
+#include "Complex_for_amp.h"
 
 #define MAX_ITERATIONS 2000
 
 using namespace concurrency;
 using std::complex;
 
-struct Complex1 { double x; double y; };
-
-Complex1 c_add(Complex1 c1, Complex1 c2) restrict(cpu, amp) // restrict keyword -able to execute this function on the GPU and CPU
-{
-	Complex1 tmp;
-	double a = c1.x;
-	double b = c1.y;
-	double c = c2.x;
-	double d = c2.y;
-	tmp.x = a + c;
-	tmp.y = b + d;
-	return tmp;
-}
-//c_add
-double c_abs(Complex1 c) restrict(cpu, amp)
-{
-	return concurrency::fast_math::sqrt((float)(c.x * c.x + c.y * c.y));
-}
-// c_abs 
-Complex1 c_mul(Complex1 c1, Complex1 c2) restrict(cpu, amp)
-{
-	Complex1 tmp;
-	double a = c1.x;
-	double b = c1.y;
-	double c = c2.x;
-	double d = c2.y;
-	tmp.x = a * c - b * d;
-	tmp.y = b * c + a * d;
-	return tmp;
-} // c_mul
 
 Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 {
 	window = hwnd;
 	mouse = mus;
-	// initialise game objects
+	
 	// instead of running entire queery_amp i just ran first line of it
 	//std::cout << accelerator::get_all().size() << std::endl;
 
@@ -60,6 +31,7 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 	//compute_mandelbrot_multicore(-2.0, 1.0, 1.125, -1.125);
 
 	double* perlin = PerlinNoise::GeneratePerlin(); //output is values between 1 and -1
+	//double* perlin = PerlinNoise::GeneratePerlin_cpu_fromWiki()// used for reference
 
 	perlin_image.create(PerlinNoise::WIDTH, PerlinNoise::HEIGHT, sf::Color::Magenta);
 
@@ -83,13 +55,12 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 
 	mandelbrot = new sf::Image;
 	mandelbrot->create(1024, 1024, sf::Color::Magenta);
-	//mandelbrot_tex.loadFromImage(blur(&perlin_image,13));
-	mandelbrot_tex.loadFromImage(perlin_image);
+	//perlin_tex.loadFromImage(blur(&perlin_image,13));
+	perlin_tex.loadFromImage(perlin_image);
 
 	//compute_mandelbrot_gpu(-2.0, 1.0, 1.125, -1.125);
 
 	//image palpatine
-
 	//palpatine.loadFromFile("palpatine.jpg");
 	//std::cout << palpatine.getSize().x << "x" << palpatine.getSize().y;
 	//palpatine_tex.loadFromImage(blur(&palpatine,7));
@@ -97,9 +68,9 @@ Level::Level(sf::RenderWindow* hwnd, Mouse* mus)
 	//rectangle
 	//rect.setSize((sf::Vector2f)window->getSize());
 	//rect.setSize(sf::Vector2f(PerlinNoise::WIDTH*2.5, PerlinNoise::WIDTH*2.5));
-	rect.setTexture(&mandelbrot_tex);
+	rect.setTexture(&perlin_tex);
+	//rect.setTexture(&mandelbrot_tex);
 	//rect.setTexture(&palpatine_tex);
-	//rect.setFillColor(sf::Color::Red);
 }
 
 Level::~Level()
@@ -156,8 +127,8 @@ void Level::handleInput()
 		recalculate();
 	}*/
 
-	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) { zoom *= 1.2; recalculate();}
-	if (sf::Keyboard::isKeyPressed(sf::Keyboard::X) && zoom > 1) {	zoom /= 1.2; recalculate();	}
+	//if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) { zoom *= 1.2; recalculate();}
+	//if (sf::Keyboard::isKeyPressed(sf::Keyboard::X) && zoom > 1) {	zoom /= 1.2; recalculate();	}
 }
 
 // Update game objects
@@ -335,7 +306,6 @@ void Level::compute_mandelbrot_gpu(double left, double right, double top, double
 	int colorPeriod = 0xFFFFFF / MAX_ITERATIONS;
 
 	//create array the size of window
-	//std::vector<uint32_t>* myvector = new std::vector<uint32_t>;
 	uint32_t* pImage = new uint32_t[Wsize.x * Wsize.y];
 	//initialise to 0
 	for (int i = 0; i < Wsize.x * Wsize.y; i++) pImage[i]=0;

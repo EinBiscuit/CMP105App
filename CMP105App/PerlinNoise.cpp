@@ -4,6 +4,8 @@ using namespace concurrency;
 
 double* PerlinNoise::GeneratePerlin()
 {
+	PerlinClock::time_point start_0 = PerlinClock::now();
+
 	srand(time(NULL));
 
 	Seed seed_arr;
@@ -20,7 +22,7 @@ double* PerlinNoise::GeneratePerlin()
 	//how many pixels are in a grid cell
 	const static int PTS = 64;
 
-	PerlinClock::time_point start = PerlinClock::now();
+	PerlinClock::time_point start_1 = PerlinClock::now();
 
 	try
 	{
@@ -28,13 +30,15 @@ double* PerlinNoise::GeneratePerlin()
 			{
 				index<2> idx = tidx.global;
 
+				double fraction = 1. / PTS;
+
 				//counterclockwise
 				Vector2 GridCorners[4] = {
 
-				seed_arr.Arr[(int)idx[0] / PTS][idx[1] / PTS],
-				seed_arr.Arr[(int)idx[0] / PTS][(idx[1] / PTS) + 1],
-				seed_arr.Arr[((int)idx[0] / PTS) + 1][(idx[1] / PTS) + 1],
-				seed_arr.Arr[((int)idx[0] / PTS) + 1][idx[1] / PTS]
+				seed_arr.Arr[idx[0] / PTS]       [idx[1] / PTS], //top left
+				seed_arr.Arr[idx[0] / PTS]       [(idx[1] / PTS) + 1], //bottom left
+				seed_arr.Arr[(idx[0] / PTS) + 1] [(idx[1] / PTS) + 1], //bottom right
+				seed_arr.Arr[(idx[0] / PTS) + 1] [idx[1] / PTS] //top right
 
 				//random(idx[0] / PTS,idx[1] / PTS),
 				//random(idx[0] / PTS,(idx[1] / PTS) + 1),
@@ -43,29 +47,25 @@ double* PerlinNoise::GeneratePerlin()
 				};
 
 
-
-				Vector2 point = { (double)tidx.local[0],(double)tidx.local[1] };
-				//normalize the vector
-				double squaresum = (point.x * point.x) + (point.y * point.y);
-				if (squaresum > 0)
+				// displacement of the candidate point to the tile origin
+				Vector2 point =
 				{
-					squaresum = fast_math::sqrt(squaresum);
-					point = { point.x / squaresum , point.y / squaresum };
-				}
-				//do the y
-				double dotone = dot(GridCorners[0], point);
-				double dottwo = dot(GridCorners[1], { point.x,-point.y });
+					(double)tidx.local[0]*fraction, (double)tidx.local[1]*fraction
+				};
+				
+				double dotone = dot(point , GridCorners[0]);
+				double dottwo = dot(GridCorners[1], { point.x, point.y-1. });
 
 				//__dp_d3d_smoothstepf produces a different result
-				double smerp_y = lerp(dotone, dottwo, (float)tidx.local[1] / PTS);
+				double smerp_0 = lerp(dotone, dottwo, point.y);
 
 				//do the x
-				dotone = dot(GridCorners[2], { -point.x,-point.y });
-				dottwo = dot(GridCorners[3], { -point.x, point.y });
+				dotone = dot(GridCorners[2], { point.x-1., point.y-1. });
+				dottwo = dot(GridCorners[3], { point.x-1., point.y });
 
-				double smerp_x = lerp(dotone, dottwo, (float)tidx.local[1] / PTS);
+				double smerp_1 = lerp(dotone, dottwo, point.y);
 
-				result_av[idx] = lerp(smerp_y, smerp_x, (float)tidx.local[0] / PTS);
+				result_av[idx] = lerp(smerp_0, smerp_1, point.x);
 			});
 	}
 	catch (const Concurrency::runtime_exception& ex)
@@ -77,8 +77,10 @@ double* PerlinNoise::GeneratePerlin()
 
 	PerlinClock::time_point end = PerlinClock::now();
 	// Compute the difference between the two times in milliseconds
-	auto time = duration_cast<milliseconds>(end - start).count();
+	auto time = duration_cast<milliseconds>(end - start_1).count();
 	std::cout << "Perlin Gpu Compute took: " << time << " ms." << std::endl;
+	time = duration_cast<milliseconds>(end - start_0).count();
+	std::cout << "Perlin Function took: " << time << " ms." << std::endl;
 
 	/*for (int i = 0; i < HEIGHT; i++)
 	{
@@ -96,6 +98,8 @@ double* PerlinNoise::GeneratePerlin()
 
 double* PerlinNoise::GeneratePerlin_cpu_fromWiki()
 {
+	PerlinClock::time_point start = PerlinClock::now();
+
 	double* result;
 
 	//to reproduce tiles
@@ -135,6 +139,9 @@ double* PerlinNoise::GeneratePerlin_cpu_fromWiki()
 		}
 
 	}
+	PerlinClock::time_point end = PerlinClock::now();
+	auto time = duration_cast<milliseconds>(end - start).count();
+	std::cout << "Perlin Function took: " << time << " ms." << std::endl;
 
 	return result;
 }

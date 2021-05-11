@@ -162,6 +162,7 @@
     <ClCompile Include="PerlinNoise.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Complex_for_amp.h" />
     <ClInclude Include="Level.h" />
     <ClInclude Include="PerlinNoise.h" />
   </ItemGroup>

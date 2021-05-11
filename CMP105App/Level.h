@@ -37,6 +37,7 @@ private:
 	sf::Image perlin_image;
 	sf::Image  palpatine;
 
+	sf::Texture perlin_tex;
 	sf::Texture palpatine_tex;
 	sf::Texture mandelbrot_tex;
 

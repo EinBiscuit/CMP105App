@@ -20,6 +20,7 @@ public:
 		double x;
 		double y;
 	};
+
 	//FROM WIKIPEDIA  ADAPTED by me TO FOR AMP
 	static Vector2 random(int x, int y) restrict(amp)
 	{
